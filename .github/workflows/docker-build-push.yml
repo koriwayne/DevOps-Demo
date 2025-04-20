@@ -1,15 +1,12 @@
-name: Docker Build and Push
+name: Deploy to EC2
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
-  build-and-push:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -30,3 +27,22 @@ jobs:
           context: .
           push: true
           tags: kwayne/myapp:latest
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.EC2_IP }} '
+            # Pull the latest image
+            docker pull kwayne/myapp:latest
+            
+            # Stop and remove the existing container if it exists
+            docker stop myapp-container || true
+            docker rm myapp-container || true
+            
+            # Run the new container
+            docker run -d --name myapp-container -p 80:8080 kwayne/myapp:latest
+          '
